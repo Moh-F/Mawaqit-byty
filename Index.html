@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>مواقيت الصلاة</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0d1117;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    color: #fff;
+  }
+
+  /* ======= شاشة التحميل ======= */
+  #loading {
+    position: fixed; inset: 0;
+    background: #0d1117;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 100;
+    transition: opacity 0.8s ease;
+  }
+  #loading .icon { font-size: 70px; animation: float 2s ease-in-out infinite; }
+  #loading h2 { margin-top: 20px; color: #f0c040; font-size: 22px; }
+  @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
+
+  /* ======= الصفحة الرئيسية (iframe) ======= */
+  #prayer-page {
+    position: fixed; inset: 0;
+    display: none;
+  }
+  #prayer-page iframe {
+    width: 100%; height: 100%; border: none;
+  }
+
+  /* ======= صفحة الطقس ======= */
+  #weather-page {
+    position: fixed; inset: 0;
+    display: none;
+    flex-direction: column;
+    background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+    overflow: hidden;
+  }
+
+  /* خلفية نجوم */
+  #weather-page::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image:
+      radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,0.4) 0%, transparent 100%),
+      radial-gradient(1px 1px at 30% 60%, rgba(255,255,255,0.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 60% 15%, rgba(255,255,255,0.5) 0%, transparent 100%),
+      radial-gradient(1px 1px at 80% 70%, rgba(255,255,255,0.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 50% 40%, rgba(255,255,255,0.4) 0%, transparent 100%),
+      radial-gradient(2px 2px at 90% 30%, rgba(255,255,255,0.6) 0%, transparent 100%),
+      radial-gradient(1px 1px at 20% 80%, rgba(255,255,255,0.3) 0%, transparent 100%);
+    pointer-events: none;
+  }
+
+  .weather-container {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 20px;
+    padding: 30px;
+  }
+
+  .weather-city {
+    font-size: 28px;
+    color: #a0d8ef;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    opacity: 0.85;
+  }
+
+  .weather-main {
+    display: flex;
+    align-items: center;
+    gap: 30px;
+  }
+
+  .weather-icon {
+    font-size: 110px;
+    filter: drop-shadow(0 0 30px rgba(255,220,100,0.4));
+    animation: float 4s ease-in-out infinite;
+  }
+
+  .weather-temp-block { text-align: center; }
+
+  .weather-temp {
+    font-size: 100px;
+    font-weight: 200;
+    color: #fff;
+    line-height: 1;
+    text-shadow: 0 0 40px rgba(255,220,100,0.3);
+  }
+
+  .weather-temp sup {
+    font-size: 36px;
+    vertical-align: super;
+    color: #f0c040;
+  }
+
+  .weather-desc {
+    font-size: 22px;
+    color: #a0d8ef;
+    margin-top: 8px;
+    letter-spacing: 1px;
+  }
+
+  .weather-details {
+    display: flex;
+    gap: 40px;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 20px;
+    padding: 20px 40px;
+    backdrop-filter: blur(10px);
+  }
+
+  .detail-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .detail-icon { font-size: 24px; }
+  .detail-value { font-size: 20px; font-weight: 600; color: #fff; }
+  .detail-label { font-size: 12px; color: #7a9bb5; letter-spacing: 1px; }
+
+  .weather-forecast {
+    display: flex;
+    gap: 16px;
+  }
+
+  .forecast-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px;
+    padding: 14px 20px;
+    min-width: 80px;
+  }
+
+  .forecast-day { font-size: 12px; color: #7a9bb5; }
+  .forecast-icon { font-size: 26px; }
+  .forecast-temp { font-size: 15px; color: #fff; font-weight: 600; }
+
+  /* ======= شريط العداد ======= */
+  #info-bar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 38px;
+    background: rgba(0,0,0,0.8);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    z-index: 9999;
+    backdrop-filter: blur(8px);
+    border-top: 1px solid rgba(255,255,255,0.07);
+  }
+
+  #mode-label { color: #f0c040; font-size: 13px; font-weight: 600; letter-spacing: 1px; }
+
+  #timer-wrap { display: flex; align-items: center; gap: 10px; color: #888; font-size: 12px; }
+  #countdown { color: #fff; font-size: 15px; font-weight: bold; min-width: 48px; text-align: center; }
+
+  #prog-bg { width: 150px; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
+  #prog-fill { height: 100%; background: linear-gradient(90deg,#f0c040,#e07020); border-radius: 2px; transition: width 1s linear; }
+
+  #dot { width: 8px; height: 8px; border-radius: 50%; background: #4caf50; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+  .fade-out { opacity: 0 !important; transition: opacity 0.6s ease !important; }
+</style>
+</head>
+<body>
+
+<!-- شاشة التحميل -->
+<div id="loading">
+  <div class="icon">🕌</div>
+  <h2>جاري التحميل...</h2>
+</div>
+
+<!-- صفحة المواقيت -->
+<div id="prayer-page">
+  <iframe id="prayer-iframe" src="" allowfullscreen></iframe>
+</div>
+
+<!-- صفحة الطقس -->
+<div id="weather-page">
+  <div class="weather-container">
+    <div class="weather-city" id="w-city">زاربروكن، ألمانيا</div>
+    <div class="weather-main">
+      <div class="weather-icon" id="w-icon">⛅</div>
+      <div class="weather-temp-block">
+        <div class="weather-temp" id="w-temp">--<sup>°C</sup></div>
+        <div class="weather-desc" id="w-desc">جاري تحميل الطقس...</div>
+      </div>
+    </div>
+    <div class="weather-details">
+      <div class="detail-item">
+        <div class="detail-icon">💧</div>
+        <div class="detail-value" id="w-humidity">--%</div>
+        <div class="detail-label">الرطوبة</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-icon">💨</div>
+        <div class="detail-value" id="w-wind">-- كم/س</div>
+        <div class="detail-label">الرياح</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-icon">🌡️</div>
+        <div class="detail-value" id="w-feels">--°C</div>
+        <div class="detail-label">يبدو كأنه</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-icon">👁️</div>
+        <div class="detail-value" id="w-vis">-- كم</div>
+        <div class="detail-label">الرؤية</div>
+      </div>
+    </div>
+    <div class="weather-forecast" id="w-forecast"></div>
+  </div>
+</div>
+
+<!-- شريط العداد -->
+<div id="info-bar">
+  <div id="mode-label">🕌 مواقيت الصلاة</div>
+  <div id="timer-wrap">
+    <div id="dot"></div>
+    <span>التبديل بعد:</span>
+    <span id="countdown">--:--</span>
+    <div id="prog-bg"><div id="prog-fill" style="width:100%"></div></div>
+  </div>
+</div>
+
+<script>
+  // ============================================================
+  // الإعدادات
+  // ============================================================
+  const PRAYER_URL      = 'https://mawaqit.net/ar/byty-saarbrucken-66115-germany';
+  const PRAYER_DURATION = 15 * 60;  // 15 دقيقة
+  const WEATHER_DURATION= 15 * 60;  // 15 دقيقة
+  const WEATHER_API_KEY = 'bd5e378503939ddaee76f12ad7a97608'; // مجاني من openweathermap
+  const WEATHER_CITY    = 'Saarbrucken,DE';
+  const WEATHER_LANG    = 'ar';
+  // ============================================================
+
+  const prayerPage  = document.getElementById('prayer-page');
+  const weatherPage = document.getElementById('weather-page');
+  const loading     = document.getElementById('loading');
+  const modeLabel   = document.getElementById('mode-label');
+  const countdown   = document.getElementById('countdown');
+  const progFill    = document.getElementById('prog-fill');
+
+  let currentMode = 'prayer'; // 'prayer' or 'weather'
+  let timeLeft, totalTime;
+
+  function fmt(s) {
+    return String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
+  }
+
+  // ======= الطقس =======
+  const WEATHER_ICONS = {
+    '01d':'☀️','01n':'🌙','02d':'⛅','02n':'⛅',
+    '03d':'☁️','03n':'☁️','04d':'☁️','04n':'☁️',
+    '09d':'🌧️','09n':'🌧️','10d':'🌦️','10n':'🌧️',
+    '11d':'⛈️','11n':'⛈️','13d':'❄️','13n':'❄️',
+    '50d':'🌫️','50n':'🌫️'
+  };
+
+  async function loadWeather() {
+    try {
+      const r = await fetch(
+        `https://api.openweathermap.org/data/2.5/weather?q=${WEATHER_CITY}&appid=${WEATHER_API_KEY}&units=metric&lang=${WEATHER_LANG}`
+      );
+      const d = await r.json();
+      document.getElementById('w-icon').textContent    = WEATHER_ICONS[d.weather[0].icon] || '🌡️';
+      document.getElementById('w-temp').innerHTML      = `${Math.round(d.main.temp)}<sup>°C</sup>`;
+      document.getElementById('w-desc').textContent    = d.weather[0].description;
+      document.getElementById('w-humidity').textContent= d.main.humidity + '%';
+      document.getElementById('w-wind').textContent    = Math.round(d.wind.speed * 3.6) + ' كم/س';
+      document.getElementById('w-feels').textContent   = Math.round(d.main.feels_like) + '°C';
+      document.getElementById('w-vis').textContent     = Math.round((d.visibility||0)/1000) + ' كم';
+
+      // توقع 5 أيام
+      const fr = await fetch(
+        `https://api.openweathermap.org/data/2.5/forecast?q=${WEATHER_CITY}&appid=${WEATHER_API_KEY}&units=metric&lang=${WEATHER_LANG}&cnt=5`
+      );
+      const fd = await fr.json();
+      const days = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+      const fc = document.getElementById('w-forecast');
+      fc.innerHTML = '';
+      fd.list.slice(0,5).forEach(item => {
+        const date = new Date(item.dt * 1000);
+        const day  = days[date.getDay()];
+        const icon = WEATHER_ICONS[item.weather[0].icon] || '🌡️';
+        const temp = Math.round(item.main.temp);
+        fc.innerHTML += `
+          <div class="forecast-item">
+            <div class="forecast-day">${day}</div>
+            <div class="forecast-icon">${icon}</div>
+            <div class="forecast-temp">${temp}°C</div>
+          </div>`;
+      });
+    } catch(e) {
+      document.getElementById('w-desc').textContent = 'تعذر تحميل الطقس';
+    }
+  }
+
+  // ======= التبديل =======
+  function showPrayer() {
+    currentMode = 'prayer';
+    timeLeft    = PRAYER_DURATION;
+    totalTime   = PRAYER_DURATION;
+    modeLabel.textContent = '🕌 مواقيت الصلاة';
+    weatherPage.style.display = 'none';
+    prayerPage.style.display  = 'block';
+  }
+
+  function showWeather() {
+    currentMode = 'weather';
+    timeLeft    = WEATHER_DURATION;
+    totalTime   = WEATHER_DURATION;
+    modeLabel.textContent = '🌤️ حالة الطقس';
+    prayerPage.style.display  = 'none';
+    weatherPage.style.display = 'flex';
+    loadWeather();
+  }
+
+  // ======= بدء التشغيل =======
+  window.addEventListener('load', () => {
+    // تحميل iframe المواقيت
+    document.getElementById('prayer-iframe').src = PRAYER_URL;
+    document.getElementById('prayer-iframe').addEventListener('load', () => {
+      loading.style.opacity = '0';
+      setTimeout(() => { loading.style.display = 'none'; }, 800);
+      prayerPage.style.display = 'block';
+    });
+
+    showPrayer();
+
+    // العداد الرئيسي
+    setInterval(() => {
+      timeLeft--;
+      countdown.textContent   = fmt(timeLeft);
+      progFill.style.width    = (timeLeft / totalTime * 100) + '%';
+
+      if (timeLeft <= 0) {
+        if (currentMode === 'prayer') showWeather();
+        else showPrayer();
+      }
+    }, 1000);
+
+    countdown.textContent = fmt(timeLeft);
+  });
+</script>
+</body>
+</html>
